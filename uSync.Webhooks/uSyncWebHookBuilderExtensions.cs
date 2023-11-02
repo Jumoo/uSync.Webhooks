@@ -1,8 +1,14 @@
-﻿using Umbraco.Cms.Core.Composing;
+﻿using Microsoft.Extensions.DependencyInjection;
+
+using Org.BouncyCastle.Asn1.Cms.Ecc;
+
+using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 
 using uSync.BackOffice;
-using uSync.Webhooks.Webhooks;
+using uSync.Webhooks.Authorization;
+using uSync.Webhooks.Configuration;
+using uSync.Webhooks.WebhookEvents;
 
 namespace uSync.Webhooks;
 
@@ -12,6 +18,7 @@ public class uSyncWebhookComposer : IComposer
     public void Compose(IUmbracoBuilder builder)
     {
         builder.AdduSyncWorkflows();
+        builder.AdduSyncWebhooks();
     }
 }
 
@@ -21,18 +28,28 @@ internal static class uSyncWebHookBuilderExtensions
     {
 
         // notifications 
-        builder.AddNotificationAsyncHandler<uSyncImportedItemNotification, uSyncImportedItemWebhook>();
-        builder.AddNotificationAsyncHandler<uSyncExportedItemNotification, uSyncExportedItemWebhook>();
+        builder.AddNotificationAsyncHandler<uSyncImportedItemNotification, uSyncImportedItemWebhookEvent>();
+        builder.AddNotificationAsyncHandler<uSyncExportedItemNotification, uSyncExportedItemWebhookEvent>();
 
-        builder.AddNotificationAsyncHandler<uSyncImportCompletedNotification, uSyncImportCompletedWebhook>();
-        builder.AddNotificationAsyncHandler<uSyncExportCompletedNotification, uSyncExportCompletedWebhook>();
+        builder.AddNotificationAsyncHandler<uSyncImportCompletedNotification, uSyncImportCompletedWebhookEvent>();
+        builder.AddNotificationAsyncHandler<uSyncExportCompletedNotification, uSyncExportCompletedWebhookEvent>();
 
         // webhooks
-        builder.WebhookEvents().Append<uSyncImportedItemWebhook>();
-        builder.WebhookEvents().Append<uSyncExportedItemWebhook>();
-        builder.WebhookEvents().Append<uSyncImportCompletedWebhook>();
-        builder.WebhookEvents().Append<uSyncExportCompletedWebhook>();
+        builder.WebhookEvents().Append<uSyncImportedItemWebhookEvent>();
+        builder.WebhookEvents().Append<uSyncExportedItemWebhookEvent>();
+        builder.WebhookEvents().Append<uSyncImportCompletedWebhookEvent>();
+        builder.WebhookEvents().Append<uSyncExportCompletedWebhookEvent>();
 
+
+        return builder;
+    }
+
+    public static IUmbracoBuilder AdduSyncWebhooks(this IUmbracoBuilder builder)
+    {
+        builder.Services.AddOptions<uSyncWebhookOptions>()
+            .Bind(builder.Config.GetSection(uSyncWebhooks.OptionsKey));
+
+        builder.Services.AddScoped<uSyncWebhookKeyAuthFilter>();
 
         return builder;
     }

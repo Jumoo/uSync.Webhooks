@@ -1,20 +1,26 @@
 ﻿using Microsoft.Extensions.Options;
 
+using Newtonsoft.Json;
+
 using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Sync;
 using Umbraco.Cms.Core.Webhooks;
 using Umbraco.Cms.Infrastructure.HostedServices;
+using Umbraco.Extensions;
 
 using uSync.BackOffice;
+using uSync.Webhooks.Models;
 
-namespace UmbTest.Webhooks;
+namespace uSync.Webhooks.WebhookEvents;
 
-public abstract class uSyncItemWebhookBase<TNotification, TObject> : IWebhookEvent, INotificationAsyncHandler<TNotification>
+public abstract class uSyncItemWebhookEventBase<TNotification, TObject> : IWebhookEvent, INotificationAsyncHandler<TNotification>
     where TNotification : uSyncItemNotification<TObject>
 {
     public string EventName { get; set; }
+
+    protected uSyncWebhookEvent EventType { get; set; }
 
     protected readonly IWebhookFiringService _webhookFiringService;
     protected readonly IWebHookService _webHookService;
@@ -23,9 +29,7 @@ public abstract class uSyncItemWebhookBase<TNotification, TObject> : IWebhookEve
 
     protected readonly IBackgroundTaskQueue _backgroundTaskQueue;
 
-
-    public uSyncItemWebhookBase(
-        string eventName,
+    public uSyncItemWebhookEventBase(
         IServerRoleAccessor serverRoleAccessor,
         IOptionsMonitor<WebhookSettings> webhookSettings,
         IWebhookFiringService webhookFiringService,
@@ -36,10 +40,16 @@ public abstract class uSyncItemWebhookBase<TNotification, TObject> : IWebhookEve
         _serverRoleAccessor = serverRoleAccessor;
         _webhookSettings = webhookSettings.CurrentValue;
 
-        EventName = eventName;
         _webhookFiringService = webhookFiringService;
         _webHookService = webHookService;
         _backgroundTaskQueue = backgroundTaskQueue;
+
+        var meta = GetType().GetCustomAttribute<uSyncWebhookAttribute>(false);
+        if (meta == null)
+            throw new InvalidOperationException("uSyncWebhook Attribute missing");
+
+        EventName = meta.EventName;
+        EventType = meta.EventType;
     }
 
     public async Task HandleAsync(TNotification notification, CancellationToken cancellationToken)
@@ -70,7 +80,13 @@ public abstract class uSyncItemWebhookBase<TNotification, TObject> : IWebhookEve
             _backgroundTaskQueue.QueueBackgroundWorkItem(
                 async cancellationToken => 
                 {
-                    await _webhookFiringService.FireAsync(webhook, EventName, notification.Item, cancellationToken);              
+                    var data = new uSyncWebhookData
+                    {
+                        EventName = EventName,
+                        Data = notification.Item
+                    };
+
+                    await _webhookFiringService.FireAsync(webhook, EventName, data, cancellationToken);              
                 });
         }
     }

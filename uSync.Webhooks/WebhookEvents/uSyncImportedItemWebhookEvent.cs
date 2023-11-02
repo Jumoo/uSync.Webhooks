@@ -7,24 +7,24 @@ using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Sync;
 using Umbraco.Cms.Infrastructure.HostedServices;
 
-using UmbTest.Webhooks;
-
 using uSync.BackOffice;
+using uSync.Webhooks.Models;
 
-namespace uSync.Webhooks.Webhooks;
+namespace uSync.Webhooks.WebhookEvents;
 
 /// <summary>
 ///  When any item is exported
 /// </summary>
-public class uSyncImportedItemWebhook : uSyncItemWebhookBase<uSyncImportedItemNotification, XElement>
+[uSyncWebhook("uSync Item Imported", uSyncWebhookEvent.Import)]
+public class uSyncImportedItemWebhookEvent : uSyncItemWebhookEventBase<uSyncImportedItemNotification, XElement>
 {
-    public uSyncImportedItemWebhook(
+    public uSyncImportedItemWebhookEvent(
         IServerRoleAccessor serverRoleAccessor,
         IOptionsMonitor<WebhookSettings> webhookSettings,
         IWebhookFiringService webhookFiringService,
         IWebHookService webHookService,
         IBackgroundTaskQueue backgroundTaskQueue)
-        : base("uSync Item Imported", serverRoleAccessor, webhookSettings, webhookFiringService, webHookService, backgroundTaskQueue)
+        : base(serverRoleAccessor, webhookSettings, webhookFiringService, webHookService, backgroundTaskQueue)
     { }
 
     protected override bool FireWebhookForNotification(uSyncImportedItemNotification notification)

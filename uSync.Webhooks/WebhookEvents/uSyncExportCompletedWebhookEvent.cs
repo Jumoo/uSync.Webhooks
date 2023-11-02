@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.Options;
 
+using Newtonsoft.Json;
+
 using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Services;
@@ -8,11 +10,12 @@ using Umbraco.Cms.Core.Webhooks;
 using Umbraco.Cms.Infrastructure.HostedServices;
 
 using uSync.BackOffice;
-using uSync.Core;
+using uSync.Webhooks.Models;
 
-namespace uSync.Webhooks.Webhooks;
-public class uSyncImportCompletedWebhook : IWebhookEvent,
-    INotificationAsyncHandler<uSyncImportCompletedNotification>
+namespace uSync.Webhooks.WebhookEvents;
+
+public class uSyncExportCompletedWebhookEvent : IWebhookEvent,
+    INotificationAsyncHandler<uSyncExportCompletedNotification>
 {
     private readonly IWebhookFiringService _webhookFiringService;
     private readonly IWebHookService _webhookService;
@@ -23,14 +26,14 @@ public class uSyncImportCompletedWebhook : IWebhookEvent,
 
     public string EventName { get; set; }
 
-    public uSyncImportCompletedWebhook(
+    public uSyncExportCompletedWebhookEvent(
         IWebhookFiringService webhookFiringService,
         IWebHookService webhookService,
         IServerRoleAccessor serverRoleAccessor,
         IOptionsMonitor<WebhookSettings> optionsMonitor,
         IBackgroundTaskQueue backgroundTaskQueue)
     {
-        EventName = "uSync Import Completed";
+        EventName = "uSync Export Completed";
         _webhookFiringService = webhookFiringService;
         _webhookService = webhookService;
         _serverRoleAccessor = serverRoleAccessor;
@@ -43,7 +46,7 @@ public class uSyncImportCompletedWebhook : IWebhookEvent,
         _backgroundTaskQueue = backgroundTaskQueue;
     }
 
-    public async Task HandleAsync(uSyncImportCompletedNotification notification, CancellationToken cancellationToken)
+    public async Task HandleAsync(uSyncExportCompletedNotification notification, CancellationToken cancellationToken)
     {
         if (_webhookSettings.Enabled is false)
         {
@@ -56,11 +59,7 @@ public class uSyncImportCompletedWebhook : IWebhookEvent,
             return;
         }
 
-        var changeActions = notification.Actions
-            .Where(x => x.Change > ChangeType.NoChange)
-            .ToList();
-
-        if (changeActions.Count == 0)
+        if (notification.Actions.Any() is false)
         {
             return;
         }
@@ -72,11 +71,18 @@ public class uSyncImportCompletedWebhook : IWebhookEvent,
             if (webhook.Enabled is false) continue;
 
             _backgroundTaskQueue.QueueBackgroundWorkItem(
-                async cancellationToken =>
-                {
+            async cancellationToken =>
+            {
 
-                    await _webhookFiringService.FireAsync(webhook, EventName, changeActions, cancellationToken);
-                });
+                var data = new uSyncWebhookData
+                {
+                    EventName = EventName,
+                    Data = notification.Actions
+                };
+
+
+                await _webhookFiringService.FireAsync(webhook, EventName, data, cancellationToken);
+            });
         }
     }
 }
