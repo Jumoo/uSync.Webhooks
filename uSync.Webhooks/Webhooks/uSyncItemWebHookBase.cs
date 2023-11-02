@@ -5,6 +5,7 @@ using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Sync;
 using Umbraco.Cms.Core.Webhooks;
+using Umbraco.Cms.Infrastructure.HostedServices;
 
 using uSync.BackOffice;
 
@@ -20,12 +21,16 @@ public abstract class uSyncItemWebhookBase<TNotification, TObject> : IWebhookEve
     protected readonly IServerRoleAccessor _serverRoleAccessor;
     protected WebhookSettings _webhookSettings;
 
+    protected readonly IBackgroundTaskQueue _backgroundTaskQueue;
+
+
     public uSyncItemWebhookBase(
         string eventName,
         IServerRoleAccessor serverRoleAccessor,
         IOptionsMonitor<WebhookSettings> webhookSettings,
         IWebhookFiringService webhookFiringService,
-        IWebHookService webHookService)
+        IWebHookService webHookService,
+        IBackgroundTaskQueue backgroundTaskQueue)
 
     {
         _serverRoleAccessor = serverRoleAccessor;
@@ -34,6 +39,7 @@ public abstract class uSyncItemWebhookBase<TNotification, TObject> : IWebhookEve
         EventName = eventName;
         _webhookFiringService = webhookFiringService;
         _webHookService = webHookService;
+        _backgroundTaskQueue = backgroundTaskQueue;
     }
 
     public async Task HandleAsync(TNotification notification, CancellationToken cancellationToken)
@@ -61,8 +67,11 @@ public abstract class uSyncItemWebhookBase<TNotification, TObject> : IWebhookEve
         {
             if (webhook.Enabled is false) continue;
 
-
-            await _webhookFiringService.FireAsync(webhook, EventName, notification.Item, cancellationToken);
+            _backgroundTaskQueue.QueueBackgroundWorkItem(
+                async cancellationToken => 
+                {
+                    await _webhookFiringService.FireAsync(webhook, EventName, notification.Item, cancellationToken);              
+                });
         }
     }
 

@@ -5,6 +5,7 @@ using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Sync;
 using Umbraco.Cms.Core.Webhooks;
+using Umbraco.Cms.Infrastructure.HostedServices;
 
 using uSync.BackOffice;
 
@@ -15,6 +16,7 @@ public class uSyncExportCompletedWebhook : IWebhookEvent,
     private readonly IWebhookFiringService _webhookFiringService;
     private readonly IWebHookService _webhookService;
     private readonly IServerRoleAccessor _serverRoleAccessor;
+    private readonly IBackgroundTaskQueue _backgroundTaskQueue;
 
     private WebhookSettings _webhookSettings;
 
@@ -24,7 +26,8 @@ public class uSyncExportCompletedWebhook : IWebhookEvent,
         IWebhookFiringService webhookFiringService,
         IWebHookService webhookService,
         IServerRoleAccessor serverRoleAccessor,
-        IOptionsMonitor<WebhookSettings> optionsMonitor)
+        IOptionsMonitor<WebhookSettings> optionsMonitor,
+        IBackgroundTaskQueue backgroundTaskQueue)
     {
         EventName = "uSync Export Completed";
         _webhookFiringService = webhookFiringService;
@@ -36,6 +39,7 @@ public class uSyncExportCompletedWebhook : IWebhookEvent,
         {
             _webhookSettings = settings;
         });
+        _backgroundTaskQueue = backgroundTaskQueue;
     }
 
     public async Task HandleAsync(uSyncExportCompletedNotification notification, CancellationToken cancellationToken)
@@ -62,7 +66,11 @@ public class uSyncExportCompletedWebhook : IWebhookEvent,
         {
             if (webhook.Enabled is false) continue;
 
-            await _webhookFiringService.FireAsync(webhook, EventName, notification.Actions, cancellationToken);
+            _backgroundTaskQueue.QueueBackgroundWorkItem(
+            async cancellationToken =>
+            {
+                await _webhookFiringService.FireAsync(webhook, EventName, notification.Actions, cancellationToken);
+            });
         }
     }
 }

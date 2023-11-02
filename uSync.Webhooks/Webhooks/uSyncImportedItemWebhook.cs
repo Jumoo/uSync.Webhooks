@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Umbraco.Cms.Core.Configuration.Models;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Sync;
+using Umbraco.Cms.Infrastructure.HostedServices;
 
 using UmbTest.Webhooks;
 
@@ -21,8 +22,9 @@ public class uSyncImportedItemWebhook : uSyncItemWebhookBase<uSyncImportedItemNo
         IServerRoleAccessor serverRoleAccessor,
         IOptionsMonitor<WebhookSettings> webhookSettings,
         IWebhookFiringService webhookFiringService,
-        IWebHookService webHookService)
-        : base("uSync Item Imported", serverRoleAccessor, webhookSettings, webhookFiringService, webHookService)
+        IWebHookService webHookService,
+        IBackgroundTaskQueue backgroundTaskQueue)
+        : base("uSync Item Imported", serverRoleAccessor, webhookSettings, webhookFiringService, webHookService, backgroundTaskQueue)
     { }
 
     protected override bool FireWebhookForNotification(uSyncImportedItemNotification notification)
